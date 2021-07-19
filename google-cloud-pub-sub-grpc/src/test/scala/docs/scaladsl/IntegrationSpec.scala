@@ -6,7 +6,6 @@ package docs.scaladsl
 
 import akka.Done
 import akka.actor.{ActorSystem, Cancellable}
-import akka.stream.ActorMaterializer
 import akka.stream.alpakka.googlecloud.pubsub.grpc.PubSubSettings
 import akka.stream.alpakka.googlecloud.pubsub.grpc.scaladsl.{GrpcPublisher, PubSubAttributes}
 import akka.stream.alpakka.testkit.scaladsl.LogCapturing
@@ -39,7 +38,6 @@ class IntegrationSpec
     with LogCapturing {
 
   implicit val system = ActorSystem("IntegrationSpec")
-  implicit val materializer = ActorMaterializer()
 
   implicit val defaultPatience = PatienceConfig(timeout = 15.seconds, interval = 50.millis)
 
@@ -178,7 +176,14 @@ class IntegrationSpec
           message.ackId
         }
         .groupedWithin(10, 1.second)
-        .map(ids => AcknowledgeRequest(ackIds = ids))
+        .map(
+          ids =>
+            AcknowledgeRequest()
+              .withSubscription(
+                s"projects/$projectId/subscriptions/$subscription"
+              )
+              .withAckIds(ids)
+        )
         .to(ackSink)
       //#acknowledge
     }

@@ -10,7 +10,6 @@ import java.util.concurrent.TimeoutException
 
 import akka.Done
 import akka.actor.ActorSystem
-import akka.stream.ActorMaterializer
 import akka.stream.alpakka.googlecloud.pubsub.scaladsl.GooglePubSub
 import akka.stream.alpakka.googlecloud.pubsub._
 import akka.stream.alpakka.testkit.scaladsl.LogCapturing
@@ -38,13 +37,11 @@ class IntegrationSpec
     with LogCapturing {
 
   private implicit val system = ActorSystem("IntegrationSpec")
-  private implicit val materializer = ActorMaterializer()
 
   override def afterAll(): Unit = TestKit.shutdownActorSystem(system)
 
   // The gCloud emulator is selected via environment parameters (in build.sbt)
   // as created in docker-compose.yml
-  private val projectId = "alpakka"
 
   // as created in docker-compose.yml
   private val topic1 = "simpleTopic"
@@ -54,7 +51,7 @@ class IntegrationSpec
   private val topic2 = "testTopic"
   private val topic2subscription = "testSubscription"
 
-  private val config = PubSubConfig(projectId, clientEmail = "not-relevant", privateKey = "not used with emulation")
+  private val config = PubSubConfig()
 
   private def readable(msg: ReceivedMessage) = new String(Base64.getDecoder.decode(msg.message.data.get))
 
@@ -126,6 +123,7 @@ class IntegrationSpec
       result2.ensureSubscription()
       result2.expectNoMessage(2.seconds)
 
+      result2.cancel()
       stream.cancel()
     }
   }

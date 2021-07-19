@@ -26,7 +26,7 @@ The table below shows direct dependencies of this module and the second tab show
 
 ## Initialization
 
-As always, before we get started we will need an @apidoc[akka.actor.ActorSystem] and a @scaladoc[Materializer](akka.stream.Materializer).
+As always, before we get started we will need an @apidoc[akka.actor.ActorSystem].
 
 Scala
 : @@snip [snip](/slick/src/test/scala/docs/scaladsl/SlickSpec.scala) { #init-mat }
@@ -109,6 +109,18 @@ Java
 ## Using a Slick Source
 
 The Slick connector allows you to perform a SQL query and expose the resulting stream of results as an Akka Streams `Source[T]`. Where `T` is any type that can be constructed using a database row.
+
+@@@ warning
+Some database systems, such as PostgreSQL, require session parameters to be set in a certain way to support streaming without caching all data at once in memory on the client side, see [Slick documentation](https://scala-slick.org/doc/3.2.0/dbio.html#streaming).
+```scala
+// Example for PostgreSQL:
+query.result.withStatementParameters(
+  rsType = ResultSetType.ForwardOnly,
+  rsConcurrency = ResultSetConcurrency.ReadOnly,
+  fetchSize = 128, // not to be left at default value (0)
+).transactionally
+```
+@@@
 
 ### Plain SQL queries
 

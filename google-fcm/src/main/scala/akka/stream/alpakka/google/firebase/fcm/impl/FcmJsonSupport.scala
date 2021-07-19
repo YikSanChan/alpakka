@@ -9,19 +9,22 @@ import akka.stream.alpakka.google.firebase.fcm.{FcmErrorResponse, FcmResponse, F
 import akka.annotation.InternalApi
 import akka.stream.alpakka.google.firebase.fcm.FcmNotification
 import akka.stream.alpakka.google.firebase.fcm.FcmNotificationModels._
-import akka.stream.alpakka.google.firebase.fcm.impl.GoogleTokenApi.OAuthResponse
 import spray.json._
 
 /**
  * INTERNAL API
  */
 @InternalApi
+@deprecated("Use akka.stream.alpakka.google.firebase.fcm.v1.impl.FcmSend", "3.0.2")
+@Deprecated
 private[fcm] case class FcmSend(validate_only: Boolean, message: FcmNotification)
 
 /**
  * INTERNAL API
  */
 @InternalApi
+@deprecated("Use akka.stream.alpakka.google.firebase.fcm.v1.impl.FcmJsonSupport", "3.0.2")
+@Deprecated
 private[fcm] object FcmJsonSupport extends DefaultJsonProtocol with SprayJsonSupport {
 
   //custom formatters
@@ -73,8 +76,6 @@ private[fcm] object FcmJsonSupport extends DefaultJsonProtocol with SprayJsonSup
     }
   }
 
-  // google -> app
-  implicit val oAuthResponseJsonFormat: RootJsonFormat[OAuthResponse] = jsonFormat3(OAuthResponse)
   //app -> google
   implicit val webPushNotificationJsonFormat: RootJsonFormat[WebPushNotification] = jsonFormat3(WebPushNotification)
   implicit val webPushConfigJsonFormat: RootJsonFormat[WebPushConfig] = jsonFormat3(WebPushConfig.apply)

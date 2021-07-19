@@ -9,7 +9,7 @@ import akka.NotUsed;
 import akka.actor.ActorSystem;
 import akka.actor.Cancellable;
 import akka.japi.Pair;
-import akka.stream.ActorMaterializer;
+import akka.stream.RestartSettings;
 import akka.stream.alpakka.googlecloud.pubsub.*;
 import akka.stream.alpakka.googlecloud.pubsub.javadsl.GooglePubSub;
 import akka.stream.javadsl.*;
@@ -26,32 +26,12 @@ public class ExampleUsageJava {
 
   private static void example() throws NoSuchAlgorithmException, InvalidKeySpecException {
 
-    // #init-mat
+    // #init-system
     ActorSystem system = ActorSystem.create();
-    ActorMaterializer materializer = ActorMaterializer.create(system);
-    // #init-mat
-
-    // #init-credentials
-    String privateKey =
-        "-----BEGIN RSA PRIVATE KEY-----\n"
-            + "MIIBOgIBAAJBAJHPYfmEpShPxAGP12oyPg0CiL1zmd2V84K5dgzhR9TFpkAp2kl2\n"
-            + "9BTc8jbAY0dQW4Zux+hyKxd6uANBKHOWacUCAwEAAQJAQVyXbMS7TGDFWnXieKZh\n"
-            + "Dm/uYA6sEJqheB4u/wMVshjcQdHbi6Rr0kv7dCLbJz2v9bVmFu5i8aFnJy1MJOpA\n"
-            + "2QIhAPyEAaVfDqJGjVfryZDCaxrsREmdKDlmIppFy78/d8DHAiEAk9JyTHcapckD\n"
-            + "uSyaE6EaqKKfyRwSfUGO1VJXmPjPDRMCIF9N900SDnTiye/4FxBiwIfdynw6K3dW\n"
-            + "fBLb6uVYr/r7AiBUu/p26IMm6y4uNGnxvJSqe+X6AxR6Jl043OWHs4AEbwIhANuz\n"
-            + "Ay3MKOeoVbx0L+ruVRY5fkW+oLHbMGtQ9dZq7Dp9\n"
-            + "-----END RSA PRIVATE KEY-----";
-
-    String clientEmail = "test-XXX@test-XXXXX.iam.gserviceaccount.com";
-    String projectId = "test-XXXXX";
-    String apiKey = "AIzaSyCVvqrlz057gCssc70n5JERyTW4TpB4ebE";
-
-    PubSubConfig config = PubSubConfig.create(projectId, clientEmail, privateKey, system);
-
+    PubSubConfig config = PubSubConfig.create();
     String topic = "topic1";
     String subscription = "subscription1";
-    // #init-credentials
+    // #init-system
 
     // #publish-single
     PublishMessage publishMessage =
@@ -64,7 +44,7 @@ public class ExampleUsageJava {
         GooglePubSub.publish(topic, config, 1);
 
     CompletionStage<List<List<String>>> publishedMessageIds =
-        source.via(publishFlow).runWith(Sink.seq(), materializer);
+        source.via(publishFlow).runWith(Sink.seq(), system);
     // #publish-single
 
     // #publish-single-with-context
@@ -81,7 +61,7 @@ public class ExampleUsageJava {
         GooglePubSub.publishWithContext(topic, config, 1);
 
     CompletionStage<List<Pair<List<String>, String>>> publishedMessageIdsWithContext =
-        sourceWithContext.via(publishFlowWithContext).runWith(Sink.seq(), materializer);
+        sourceWithContext.via(publishFlowWithContext).runWith(Sink.seq(), system);
     // #publish-single-with-context
 
     // #publish-fast
@@ -90,7 +70,7 @@ public class ExampleUsageJava {
         .groupedWithin(1000, Duration.ofMinutes(1))
         .map(messages -> PublishRequest.create(messages))
         .via(publishFlow)
-        .runWith(Sink.ignore(), materializer);
+        .runWith(Sink.ignore(), system);
     // #publish-fast
 
     // #subscribe
@@ -115,9 +95,7 @@ public class ExampleUsageJava {
     Source.tick(Duration.ofSeconds(0), Duration.ofSeconds(10), Done.getInstance())
         .via(
             RestartFlow.withBackoff(
-                Duration.ofSeconds(1),
-                Duration.ofSeconds(30),
-                0.2,
+                RestartSettings.create(Duration.ofSeconds(1), Duration.ofSeconds(30), 0.2),
                 () -> GooglePubSub.subscribeFlow(subscription, config)))
         .map(
             message -> {

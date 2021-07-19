@@ -88,6 +88,11 @@ private[elasticsearch] final class ElasticsearchSourceLogic[T](
   private var pullIsWaitingForData = false
   private var dataReady: Option[ScrollResponse[T]] = None
 
+  def prepareUri(path: Path): Uri = {
+    Uri(settings.connection.baseUrl)
+      .withPath(path)
+  }
+
   def sendScrollScanRequest(): Unit =
     try {
       waitingForElasticData = true
@@ -112,10 +117,19 @@ private[elasticsearch] final class ElasticsearchSourceLogic[T](
           }
         )
 
-        val baseMap = Map("scroll" -> settings.scroll, "sort" -> "_doc")
-        val routingKey = "routing"
-        val queryParams = searchParams.get(routingKey).fold(baseMap)(r => baseMap + (routingKey -> r))
-        val completeParams = searchParams ++ extraParams.flatten - routingKey
+        val baseMap = Map("scroll" -> settings.scroll)
+
+        // only force sorting by _doc (meaning order is not known) if not specified in search params
+        val sortQueryParam = if (searchParams.contains("sort")) {
+          None
+        } else {
+          Some(("sort", "_doc"))
+        }
+
+        val routingQueryParam = searchParams.get("routing").map(r => ("routing", r))
+
+        val queryParams = baseMap ++ routingQueryParam ++ sortQueryParam
+        val completeParams = searchParams ++ extraParams.flatten - "routing"
 
         val searchBody = "{" + completeParams
             .map {
@@ -128,12 +142,16 @@ private[elasticsearch] final class ElasticsearchSourceLogic[T](
           case ApiVersion.V5 => s"/${elasticsearchParams.indexName}/${elasticsearchParams.typeName.get}/_search"
           case ApiVersion.V7 => s"/${elasticsearchParams.indexName}/_search"
         }
-        val uri = Uri(settings.connection.baseUrl).withPath(Path(endpoint)).withQuery(Uri.Query(queryParams))
+
+        val uri = prepareUri(Path(endpoint))
+          .withQuery(Uri.Query(queryParams))
+
         val request = HttpRequest(HttpMethods.POST)
           .withUri(uri)
           .withEntity(
             HttpEntity(ContentTypes.`application/json`, searchBody)
           )
+          .withHeaders(settings.connection.headers)
 
         ElasticsearchApi
           .executeRequest(
@@ -154,13 +172,15 @@ private[elasticsearch] final class ElasticsearchSourceLogic[T](
       } else {
         log.debug("Fetching next scroll")
 
-        val uri = Uri(settings.connection.baseUrl).withPath(Path("/_search/scroll"))
+        val uri = prepareUri(Path("/_search/scroll"))
+
         val request = HttpRequest(HttpMethods.POST)
           .withUri(uri)
           .withEntity(
             HttpEntity(ContentTypes.`application/json`,
                        Map("scroll" -> settings.scroll, "scroll_id" -> scrollId).toJson.compactPrint)
           )
+          .withHeaders(settings.connection.headers)
 
         ElasticsearchApi
           .executeRequest(
@@ -276,9 +296,11 @@ private[elasticsearch] final class ElasticsearchSourceLogic[T](
       completeStage()
     } else {
       // Clear the scroll
-      val uri = Uri(settings.connection.baseUrl).withPath(Path(s"/_search/scroll/$scrollId"))
+      val uri = prepareUri(Path(s"/_search/scroll/$scrollId"))
+
       val request = HttpRequest(HttpMethods.DELETE)
         .withUri(uri)
+        .withHeaders(settings.connection.headers)
 
       ElasticsearchApi
         .executeRequest(request, settings.connection)
